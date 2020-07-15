@@ -5,20 +5,24 @@ namespace WyriHaximus\React\Filesystem\S3;
 use Aws\Result;
 use Aws\S3\S3Client;
 use Aws\Sdk;
+use Exception;
 use GuzzleHttp\HandlerStack;
+use InvalidArgumentException;
 use React\EventLoop\LoopInterface;
 use React\EventLoop\Timer\Timer;
 use React\Filesystem\AdapterInterface;
-use React\Filesystem\CallInvokerInterface;
 use React\Filesystem\FilesystemInterface;
 use React\Filesystem\Node\NodeInterface;
 use React\Filesystem\ObjectStream;
-use React\Filesystem\PooledInvoker;
 use React\Promise\Deferred;
 use React\Promise\FulfilledPromise;
+use React\Promise\Promise;
+use React\Promise\PromiseInterface;
 use React\Promise\RejectedPromise;
 use React\Stream\WritableStreamInterface;
 use WyriHaximus\React\GuzzlePsr7\HttpClientAdapter;
+use function GuzzleHttp\Promise\queue;
+use function React\Promise\resolve;
 
 class S3Adapter implements AdapterInterface
 {
@@ -43,11 +47,6 @@ class S3Adapter implements AdapterInterface
     protected $bucket;
 
     /**
-     * @var PooledInvoker
-     */
-    protected $invoker;
-
-    /**
      * @var FilesystemInterface
      */
     protected $filesystem;
@@ -65,7 +64,6 @@ class S3Adapter implements AdapterInterface
         }
         $this->s3Client = (new Sdk($options))->createS3();
         $this->bucket = $bucket;
-        $this->invoker = new PooledInvoker($this);
     }
 
     /**
@@ -85,19 +83,10 @@ class S3Adapter implements AdapterInterface
     }
 
     /**
-     * @param CallInvokerInterface $invoker
-     * @return void
-     */
-    public function setInvoker(CallInvokerInterface $invoker)
-    {
-        $this->invoker = $invoker;
-    }
-
-    /**
      * @param string $function
      * @param array $args
      * @param int $errorResultCode
-     * @return \React\Promise\Promise
+     * @return Promise
      */
     public function callFilesystem($function, $args, $errorResultCode = -1)
     {
@@ -118,18 +107,18 @@ class S3Adapter implements AdapterInterface
         }
 
         $this->queueTimer = $this->loop->addPeriodicTimer(HttpClientAdapter::QUEUE_TIMER_INTERVAL, function (Timer $timer) {
-            \GuzzleHttp\Promise\queue()->run();
+            queue()->run();
 
-            if ($this->invoker->isEmpty()) {
+            /*if ($this->invoker->isEmpty()) {
                 $timer->cancel();
-            }
+            }*/
         });
     }
 
     /**
      * @param string $path
      * @param $mode
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function mkdir($path, $mode = self::CREATION_MODE)
     {
@@ -138,7 +127,7 @@ class S3Adapter implements AdapterInterface
 
     /**
      * @param string $path
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function rmdir($path)
     {
@@ -147,16 +136,16 @@ class S3Adapter implements AdapterInterface
 
     /**
      * @param string $filename
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function unlink($filename)
     {
-        return $this->invoker->invokeCall('deleteObject', [
+        return $this->callFilesystem('deleteObject', [
             'Bucket' => $this->bucket,
             'Key' => $filename,
-        ])->then(function () {
+        ])->then(static function () {
             return new FulfilledPromise();
-        }, function () {
+        }, static function () {
             return new RejectedPromise();
         });
     }
@@ -164,7 +153,7 @@ class S3Adapter implements AdapterInterface
     /**
      * @param string $path
      * @param int $mode
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function chmod($path, $mode)
     {
@@ -175,16 +164,16 @@ class S3Adapter implements AdapterInterface
      * @param string $path
      * @param int $uid
      * @param int $gid
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function chown($path, $uid, $gid)
     {
-        return new RejectedPromise(new \Exception('No implemented, not intended for use'));
+        return new RejectedPromise(new Exception('No implemented, not intended for use'));
     }
 
     /**
      * @param string $filename
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function stat($filename)
     {
@@ -192,7 +181,7 @@ class S3Adapter implements AdapterInterface
             return new FulfilledPromise([]);
         }
 
-        return $this->invoker->invokeCall('headObject', [
+        return $this->callFilesystem('headObject', [
             'Bucket' => $this->bucket,
             'Key' => $filename,
         ])->then(function (Result $result) {
@@ -211,14 +200,13 @@ class S3Adapter implements AdapterInterface
 
     /**
      * @param string $path
-     * @param int $flags
-     * @return \React\Promise\PromiseInterface
+     * @return ObjectStream
      */
-    public function ls($path, $flags = EIO_READDIR_DIRS_FIRST)
+    public function ls($path)
     {
         $stream = new ObjectStream();
 
-        $this->invoker->invokeCall('listObjects', [
+        $this->callFilesystem('listObjects', [
             'Bucket' => $this->bucket,
             'Delimiter' => '/',
             'Prefix' => $path,
@@ -234,7 +222,7 @@ class S3Adapter implements AdapterInterface
         if (isset($array['Contents'])) {
             foreach ($array['Contents'] as $file) {
                 $stream->emit('data', [
-                    $this->filesystem->file($file['Key'], $this),
+                    $this->filesystem->file($file['Key']),
                 ]);
             }
         }
@@ -253,7 +241,7 @@ class S3Adapter implements AdapterInterface
     /**
      * @param string $path
      * @param $mode
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function touch($path, $mode = self::CREATION_MODE)
     {
@@ -273,7 +261,7 @@ class S3Adapter implements AdapterInterface
      * @param string $path
      * @param string $flags
      * @param $mode
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function open($path, $flags, $mode = self::CREATION_MODE)
     {
@@ -285,16 +273,16 @@ class S3Adapter implements AdapterInterface
             return $this->openWrite($path);
         }
 
-        throw new \InvalidArgumentException('Open must be used with read or write flag');
+        throw new InvalidArgumentException('Open must be used with read or write flag');
     }
 
     protected function openRead($path)
     {
-        return $this->invoker->invokeCall('getObject', [
+        return $this->callFilesystem('getObject', [
             'Bucket' => $this->bucket,
             'Key' => $path,
         ])->then(function (Result $result) {
-            return \React\Promise\resolve($result['Body']);
+            return resolve($result['Body']);
         });
     }
 
@@ -302,36 +290,36 @@ class S3Adapter implements AdapterInterface
     {
         $sink = new BufferedSink();
         $sink->promise()->then(function ($body) use ($path) {
-            return $this->invoker->invokeCall('putObject', [
+            return $this->callFilesystem('putObject', [
                 'Body' => $body,
                 'ContentLength' => strlen($body),
                 'Bucket' => $this->bucket,
                 'Key' => $path,
             ]);
         })->then(function ($result) {
-            return \React\Promise\resolve($result['Body']);
+            return resolve($result['Body']);
         });
-        return \React\Promise\resolve($sink);
+        return resolve($sink);
     }
 
     /**
      * @param resource $fd
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function close($fd)
     {
-        return new RejectedPromise(new \Exception('No implemented, not intended for use'));
+        return new RejectedPromise(new Exception('No implemented, not intended for use'));
     }
 
     /**
      * @param $fileDescriptor
      * @param int $length
      * @param int $offset
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function read($fileDescriptor, $length, $offset)
     {
-        return new RejectedPromise(new \Exception('No implemented, not intended for use'));
+        return new RejectedPromise(new Exception('No implemented, not intended for use'));
     }
 
     /**
@@ -339,21 +327,21 @@ class S3Adapter implements AdapterInterface
      * @param string $data
      * @param int $length
      * @param int $offset
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function write($fileDescriptor, $data, $length, $offset)
     {
-        return new RejectedPromise(new \Exception('No implemented, not intended for use'));
+        return new RejectedPromise(new Exception('No implemented, not intended for use'));
     }
 
     /**
      * @param string $fromPath
      * @param string $toPath
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function rename($fromPath, $toPath)
     {
-        return $this->invoker->invokeCall('copyObject', [
+        return $this->callFilesystem('copyObject', [
             'Bucket' => $this->bucket,
             'Key' => $toPath,
             'CopySource' => $this->bucket . '/' . $fromPath,
@@ -364,5 +352,50 @@ class S3Adapter implements AdapterInterface
         }, function () {
             return new RejectedPromise();
         });
+    }
+
+    public static function isSupported()
+    {
+        return true;
+    }
+
+    public function getFilesystem()
+    {
+        return $this->filesystem;
+    }
+
+    public function lsStream($path)
+    {
+        // TODO: Implement lsStream() method.
+    }
+
+    public function getContents($path, $offset = 0, $length = null)
+    {
+        // TODO: Implement getContents() method.
+    }
+
+    public function putContents($path, $content)
+    {
+        // TODO: Implement putContents() method.
+    }
+
+    public function appendContents($path, $content)
+    {
+        // TODO: Implement appendContents() method.
+    }
+
+    public function readlink($path)
+    {
+        // TODO: Implement readlink() method.
+    }
+
+    public function symlink($fromPath, $toPath)
+    {
+        // TODO: Implement symlink() method.
+    }
+
+    public function detectType($path)
+    {
+        // TODO: Implement detectType() method.
     }
 }

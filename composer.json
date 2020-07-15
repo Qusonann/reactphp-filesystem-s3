@@ -8,15 +8,27 @@
     }
   ],
   "require": {
+    "react/event-loop": "^1.0.0",
+    "react/promise": "^2.8.0",
+    "react/stream": "^1.1.1",
     "react/filesystem": "dev-travis-php-7.3-and-7.4",
     "guzzlehttp/guzzle": "^6.0",
-    "wyrihaximus/react-guzzle-psr7": "^1.0",
+    "wyrihaximus/react-guzzle-psr7": "^2.1.2",
     "aws/aws-sdk-php": "^3.0"
+  }
+  ,
+  "require-dev": {
+    "roave/security-advisories": "dev-master",
+    "phpunit/phpunit": "^9.0"
   },
   "repositories": [
       {
           "type": "vcs",
-          "url": "https://github.com/WyriHaximus-secret-labs/filesystem"
+          "url": "https://github.com/Qusonann/evenement"
+      },
+      {
+          "type": "vcs",
+          "url": "https://github.com/Qusonann/filesystem"
       }
   ],
   "autoload": {
@@ -28,5 +40,7 @@
     "psr-4": {
       "WyriHaximus\\React\\Tests\\Filesystem\\S3\\": "tests/"
     }
-  }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
 }

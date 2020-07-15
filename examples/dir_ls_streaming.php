@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 use React\EventLoop\Factory;
 use React\Filesystem\Filesystem;
@@ -9,7 +10,7 @@ require 'vendor/autoload.php';
 
 try {
     $loop = Factory::create();
-    $loop->futureTick(function () use ($loop) {
+    $loop->futureTick(static function () use ($loop) {
         $adapter = new S3Adapter($loop, [
             'credentials' => [
                 'key' => 'KEY',
@@ -18,14 +19,14 @@ try {
             'region' => 'REGION',
             'version' => 'latest',
         ], 'BUCKET');
-        $filesystem = Filesystem::createFromAdapter($adapter);
-        $stream = $filesystem->dir('')->lsStreaming();
-        $stream->on('data', function (NodeInterface $node) {
+        $stream = Filesystem::createFromAdapter($adapter)->dir('')->lsStreaming();
+        $stream->on('data', static function (NodeInterface $node) {
             echo $node->getPath(), PHP_EOL;
         });
     });
 
     $loop->run();
 } catch (Exception $e) {
+    /** @noinspection UnusedFunctionResultInspection */
     var_export($e->getMessage());
 }
