@@ -24,11 +24,13 @@
   "repositories": [
       {
           "type": "vcs",
-          "url": "https://github.com/Qusonann/evenement"
+          "url": "https://github.com/Qusonann/evenement",
+          "no-api": true
       },
       {
           "type": "vcs",
-          "url": "https://github.com/Qusonann/filesystem"
+          "url": "https://github.com/Qusonann/filesystem",
+          "no-api": true
       }
   ],
   "autoload": {

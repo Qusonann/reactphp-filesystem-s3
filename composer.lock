@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "dff395ec66cd889192452c9e2ad4b82e",
+    "content-hash": "b7c5037e42a1dc1f48ecba21d037f325",
     "packages": [
         {
             "name": "aws/aws-sdk-php",
@@ -553,7 +553,7 @@
             "version": "v3.0.2",
             "source": {
                 "type": "git",
-                "url": "https://github.com/Qusonann/evenement.git",
+                "url": "https://github.com/Qusonann/evenement",
                 "reference": "3cf8986c9bf1fee11e29919ddcb7c0e5b753b326"
             },
             "dist": {
@@ -1208,7 +1208,7 @@
             "version": "dev-travis-php-7.3-and-7.4",
             "source": {
                 "type": "git",
-                "url": "https://github.com/Qusonann/filesystem.git",
+                "url": "https://github.com/Qusonann/filesystem",
                 "reference": "4bc92a61d6b44d6969351c1c23e3201d6899f5c5"
             },
             "dist": {
