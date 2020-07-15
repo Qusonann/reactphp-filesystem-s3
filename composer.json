@@ -8,11 +8,17 @@
     }
   ],
   "require": {
-    "react/filesystem": "dev-master",
+    "react/filesystem": "dev-travis-php-7.3-and-7.4",
     "guzzlehttp/guzzle": "^6.0",
     "wyrihaximus/react-guzzle-psr7": "^1.0",
     "aws/aws-sdk-php": "^3.0"
   },
+  "repositories": [
+      {
+          "type": "vcs",
+          "url": "https://github.com/WyriHaximus-secret-labs/filesystem"
+      }
+  ],
   "autoload": {
     "psr-4": {
       "WyriHaximus\\React\\Filesystem\\S3\\": "src/"
